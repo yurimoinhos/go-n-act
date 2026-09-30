@@ -36,6 +36,16 @@ log.Fatal(http.ListenAndServe(":8080", &gnact.Server{
 }))
 ```
 
+To serve the UI from the same origin, wrap the server in `App`. Requests under `APIPrefix` (default `/api`) go to the API, and every other request goes to the UI. When `DevURL` is set, the UI is proxied to the dev server, HMR websocket included. Otherwise it is served from `Dist`. A path with no extension that is not a file gets `index.html`, so client routes survive a reload. A missing asset stays `404`.
+
+```go
+log.Fatal(http.ListenAndServe(":8080", &gnact.App{
+    API:    &gnact.Server{Router: r},
+    DevURL: os.Getenv("UI_DEV_URL"), // e.g. http://localhost:5173 in development
+    Dist:   os.DirFS("dist"),        // vite build output
+}))
+```
+
 In the UI, import the generated tree and the `@aggitech/route` entry. The generated client imports `@aggitech/route/client`, so a bundle that only calls the server does not pull in React.
 
 ## Route files
@@ -240,6 +250,8 @@ Leaf selection looks at the whole tree. A static segment scores 10, a parameter 
 While the new load is pending, previous matches stay. A superseded load does not write its result and does not apply its redirect. Two in-flight navigations to the same href share one load. The cache stores only loaders that finished successfully. The key is the route id plus the href. `staleTime` 0 fetches again.
 
 `MemoryHistory` does not notify listeners on `push` and `replace`. `back` and `forward` do.
+
+`createRouter` follows the browser address bar (`BrowserHistory`: `pushState`, `replaceState`, `popstate`) when a `window` exists, and memory (`MemoryHistory`) elsewhere. Pass `history` to choose. `RouterProvider` loads the current location on mount when nothing has loaded yet.
 
 `RouterProvider` renders the root component, or `Outlet`. `Outlet` goes one level down. `Link` calls `preventDefault` on an unmodified left click.
 
