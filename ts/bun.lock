@@ -1,0 +1,59 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "@aggitech/route",
+      "devDependencies": {
+        "@types/react": "^18.3.18",
+        "@types/react-dom": "^18.3.5",
+        "@types/react-test-renderer": "^18.3.0",
+        "bun-types": "^1.3.4",
+        "react": "^18.3.1",
+        "react-dom": "^18.3.1",
+        "react-test-renderer": "^18.3.1",
+        "typescript": "^5.8.3",
+      },
+      "peerDependencies": {
+        "react": ">=18",
+      },
+    },
+  },
+  "packages": {
+    "@types/node": ["@types/node@26.6.3", "https://pkgs.dev.azure.com/gateway-ticketing-systems/5305f5cc-b787-4d95-9a4c-f6a6f06e6f76/_packaging/gts-npm/npm/registry/@types/node/-/node-26.6.3.tgz", { "dependencies": { "undici-types": "~8.9.0" } }, "sha512-dsqMQQoeTLqu9wynDD00q573mNzso3IdQOAfHRJqLCcmCFPoGo9A1bDpUcv/9tnKpErQWv9uKeGfl37EIS02Yg=="],
+
+    "@types/prop-types": ["@types/prop-types@15.7.15", "https://pkgs.dev.azure.com/gateway-ticketing-systems/5305f5cc-b787-4d95-9a4c-f6a6f06e6f76/_packaging/gts-npm/npm/registry/@types/prop-types/-/prop-types-15.7.15.tgz", {}, "sha1-5uWobWAr6spxzlFj+t9fldcJMcc="],
+
+    "@types/react": ["@types/react@18.3.31", "https://pkgs.dev.azure.com/gateway-ticketing-systems/5305f5cc-b787-4d95-9a4c-f6a6f06e6f76/_packaging/gts-npm/npm/registry/@types/react/-/react-18.3.31.tgz", { "dependencies": { "@types/prop-types": "*", "csstype": "^3.2.2" } }, "sha1-teleKP/M6rjZgvM/LrB24XZTwqQ="],
+
+    "@types/react-dom": ["@types/react-dom@18.3.7", "https://pkgs.dev.azure.com/gateway-ticketing-systems/5305f5cc-b787-4d95-9a4c-f6a6f06e6f76/_packaging/gts-npm/npm/registry/@types/react-dom/-/react-dom-18.3.7.tgz", { "peerDependencies": { "@types/react": "^18.0.0" } }, "sha1-uJ3fLNg7T+r8xOLqQa/fuVoNGU8="],
+
+    "@types/react-test-renderer": ["@types/react-test-renderer@18.3.1", "https://pkgs.dev.azure.com/gateway-ticketing-systems/5305f5cc-b787-4d95-9a4c-f6a6f06e6f76/_packaging/gts-npm/npm/registry/@types/react-test-renderer/-/react-test-renderer-18.3.1.tgz", { "dependencies": { "@types/react": "^18" } }, "sha512-vAhnk0tG2eGa37lkU9+s5SoroCsRI08xnsWFiAXOuPH2jqzMbcXvKExXViPi1P5fIklDeCvXqyrdmipFaSkZrA=="],
+
+    "bun-types": ["bun-types@1.4.2", "https://pkgs.dev.azure.com/gateway-ticketing-systems/5305f5cc-b787-4d95-9a4c-f6a6f06e6f76/_packaging/gts-npm/npm/registry/bun-types/-/bun-types-1.4.2.tgz", { "dependencies": { "@types/node": "*" } }, "sha1-jyE7AmMYfkoSUgoG0ZWyGb+GhNk="],
+
+    "csstype": ["csstype@3.2.3", "https://pkgs.dev.azure.com/gateway-ticketing-systems/5305f5cc-b787-4d95-9a4c-f6a6f06e6f76/_packaging/gts-npm/npm/registry/csstype/-/csstype-3.2.3.tgz", {}, "sha1-7EjA8+mT5QZIyG2lWeJhCZXPmJo="],
+
+    "js-tokens": ["js-tokens@4.0.0", "https://pkgs.dev.azure.com/gateway-ticketing-systems/5305f5cc-b787-4d95-9a4c-f6a6f06e6f76/_packaging/gts-npm/npm/registry/js-tokens/-/js-tokens-4.0.0.tgz", {}, "sha1-GSA/tZmR35jjoocFDUZHzerzJJk="],
+
+    "loose-envify": ["loose-envify@1.4.0", "https://pkgs.dev.azure.com/gateway-ticketing-systems/5305f5cc-b787-4d95-9a4c-f6a6f06e6f76/_packaging/gts-npm/npm/registry/loose-envify/-/loose-envify-1.4.0.tgz", { "dependencies": { "js-tokens": "^3.0.0 || ^4.0.0" }, "bin": { "loose-envify": "cli.js" } }, "sha1-ce5R+nvkyuwaY4OffmgtgTLTDK8="],
+
+    "object-assign": ["object-assign@4.1.1", "https://pkgs.dev.azure.com/gateway-ticketing-systems/5305f5cc-b787-4d95-9a4c-f6a6f06e6f76/_packaging/gts-npm/npm/registry/object-assign/-/object-assign-4.1.1.tgz", {}, "sha1-IQmtx5ZYh8/AXLvUQsrIv7s2CGM="],
+
+    "react": ["react@18.3.1", "https://pkgs.dev.azure.com/gateway-ticketing-systems/5305f5cc-b787-4d95-9a4c-f6a6f06e6f76/_packaging/gts-npm/npm/registry/react/-/react-18.3.1.tgz", { "dependencies": { "loose-envify": "^1.1.0" } }, "sha1-SauJIAnFOTNiW9FrJTP8dUyrKJE="],
+
+    "react-dom": ["react-dom@18.3.1", "https://pkgs.dev.azure.com/gateway-ticketing-systems/5305f5cc-b787-4d95-9a4c-f6a6f06e6f76/_packaging/gts-npm/npm/registry/react-dom/-/react-dom-18.3.1.tgz", { "dependencies": { "loose-envify": "^1.1.0", "scheduler": "^0.23.2" }, "peerDependencies": { "react": "^18.3.1" } }, "sha1-wiZdeVEbV9R5s90/36UVNklMXLQ="],
+
+    "react-is": ["react-is@18.3.1", "https://pkgs.dev.azure.com/gateway-ticketing-systems/5305f5cc-b787-4d95-9a4c-f6a6f06e6f76/_packaging/gts-npm/npm/registry/react-is/-/react-is-18.3.1.tgz", {}, "sha1-6DVX3BLq5jqZ4AOkY4ix3LtE234="],
+
+    "react-shallow-renderer": ["react-shallow-renderer@16.15.0", "https://pkgs.dev.azure.com/gateway-ticketing-systems/5305f5cc-b787-4d95-9a4c-f6a6f06e6f76/_packaging/gts-npm/npm/registry/react-shallow-renderer/-/react-shallow-renderer-16.15.0.tgz", { "dependencies": { "object-assign": "^4.1.1", "react-is": "^16.12.0 || ^17.0.0 || ^18.0.0" }, "peerDependencies": { "react": "^16.0.0 || ^17.0.0 || ^18.0.0" } }, "sha1-SPss+bI9I83pZwj+UnOn00RvRFc="],
+
+    "react-test-renderer": ["react-test-renderer@18.3.1", "https://pkgs.dev.azure.com/gateway-ticketing-systems/5305f5cc-b787-4d95-9a4c-f6a6f06e6f76/_packaging/gts-npm/npm/registry/react-test-renderer/-/react-test-renderer-18.3.1.tgz", { "dependencies": { "react-is": "^18.3.1", "react-shallow-renderer": "^16.15.0", "scheduler": "^0.23.2" }, "peerDependencies": { "react": "^18.3.1" } }, "sha1-5pNgih+WKDQA1KOv6taJP5WLgLQ="],
+
+    "scheduler": ["scheduler@0.23.2", "https://pkgs.dev.azure.com/gateway-ticketing-systems/5305f5cc-b787-4d95-9a4c-f6a6f06e6f76/_packaging/gts-npm/npm/registry/scheduler/-/scheduler-0.23.2.tgz", { "dependencies": { "loose-envify": "^1.1.0" } }, "sha1-QUumSjsoKJLpRM8hCOzAeNEVzcM="],
+
+    "typescript": ["typescript@5.9.3", "https://pkgs.dev.azure.com/gateway-ticketing-systems/5305f5cc-b787-4d95-9a4c-f6a6f06e6f76/_packaging/gts-npm/npm/registry/typescript/-/typescript-5.9.3.tgz", { "bin": { "tsc": "./bin/tsc", "tsserver": "./bin/tsserver" } }, "sha1-W09Z4VMQqxeiFvXWz1PuR27eZw8="],
+
+    "undici-types": ["undici-types@8.9.0", "https://pkgs.dev.azure.com/gateway-ticketing-systems/5305f5cc-b787-4d95-9a4c-f6a6f06e6f76/_packaging/gts-npm/npm/registry/undici-types/-/undici-types-8.9.0.tgz", {}, "sha1-4kDZfItdheU0fOc9JYZceQbB7J8="],
+  }
+}
