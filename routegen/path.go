@@ -213,6 +213,9 @@ func skipRel(rel string) bool {
 	switch {
 	case base == "doc.go", base == "routeTree.gen.tsx":
 		return true
+	case rel == runtimeDirName || strings.HasPrefix(rel, runtimeDirName+"/"):
+		// The embedded runtime that routegen writes under routes/gnact/ is not a route.
+		return true
 	case strings.HasSuffix(rel, "_test.go"):
 		return true
 	case strings.HasSuffix(rel, ".gen.go"), strings.HasSuffix(rel, ".gen.ts"), strings.HasSuffix(rel, ".gen.tsx"):
