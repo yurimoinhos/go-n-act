@@ -3,7 +3,6 @@ package routegen
 import (
 	"context"
 	"fmt"
-	"go/format"
 	"go/token"
 	"os"
 	"path"
@@ -15,7 +14,6 @@ import (
 
 const (
 	defaultImportPath = "github.com/yurimoinhos/go-n-act"
-	defaultTSImport   = "@aggitech/route"
 )
 
 // InitOptions configures a new app or a routes folder.
@@ -31,7 +29,8 @@ type InitOptions struct {
 	// Replace is a local directory written as a go.mod replace for this module.
 	// Empty omits the replace line. It applies to the app template.
 	Replace string
-	// TSImport is the TypeScript specifier. Empty means @aggitech/route.
+	// TSImport is an optional npm TypeScript specifier. Empty embeds the
+	// runtime under routes/gnact/ from the gnact binary (no npm gnact dep).
 	TSImport string
 	// ImportPath is the Go import path of this module. Empty means github.com/yurimoinhos/go-n-act.
 	ImportPath string
@@ -49,7 +48,7 @@ type AddOptions struct {
 	Style string
 	// Generate writes the typed client, registers, and route tree after the route files.
 	Generate bool
-	// TSImport is the TypeScript specifier. Empty means @aggitech/route.
+	// TSImport is an optional npm TypeScript specifier. Empty embeds routes/gnact/.
 	TSImport string
 	// ImportPath is the Go import path of this module. Empty means github.com/yurimoinhos/go-n-act.
 	ImportPath string
@@ -87,9 +86,6 @@ func Init(ctx context.Context, opt InitOptions) ([]string, error) {
 	}
 	routesAbs := filepath.Join(project, filepath.FromSlash(routesRel))
 	tsImport := opt.TSImport
-	if tsImport == "" {
-		tsImport = defaultTSImport
-	}
 	lib := opt.ImportPath
 	if lib == "" {
 		lib = defaultImportPath
@@ -128,18 +124,24 @@ func Init(ctx context.Context, opt InitOptions) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
+		runtimeImp := path.Join("..", routesRel, runtimeDirName, "index.ts")
+		if tsImport != "" && !strings.HasPrefix(tsImport, ".") {
+			runtimeImp = tsImport
+		} else if tsImport != "" {
+			runtimeImp = tsImport
+		}
 		files := []struct {
 			rel  string
 			body string
 		}{
 			{rel: "go.mod", body: goMod},
 			{rel: "cmd/server/main.go", body: mainSrc},
-			{rel: "package.json", body: renderPackageJSON(npmName(opt.Dir), tsImport)},
+			{rel: "package.json", body: renderPackageJSON(npmName(opt.Dir))},
 			{rel: "index.html", body: indexHTML},
-			{rel: "src/main.tsx", body: renderEntry(tsImport, path.Join("..", routesRel, "routeTree.gen"))},
+			{rel: "src/main.tsx", body: renderEntry(runtimeImp, path.Join("..", routesRel, "routeTree.gen"))},
 			{rel: "vite.config.ts", body: viteConfig},
 			{rel: ".gitignore", body: gitignore},
-			{rel: path.Join(routesRel, "__root.tsx"), body: renderRoot(tsImport)},
+			{rel: path.Join(routesRel, "__root.tsx"), body: renderRoot(rootImport(tsImport))},
 		}
 		for _, file := range files {
 			if err := writeNew(filepath.Join(project, filepath.FromSlash(file.rel)), []byte(file.body)); err != nil {
@@ -154,7 +156,7 @@ func Init(ctx context.Context, opt InitOptions) ([]string, error) {
 			}
 		}
 		rootRel := path.Join(routesRel, "__root.tsx")
-		if err := writeNew(filepath.Join(project, filepath.FromSlash(rootRel)), []byte(renderRoot(tsImport))); err != nil {
+		if err := writeNew(filepath.Join(project, filepath.FromSlash(rootRel)), []byte(renderRoot(rootImport(tsImport)))); err != nil {
 			return nil, err
 		}
 		created = append(created, rootRel)
@@ -227,9 +229,6 @@ func Add(ctx context.Context, opt AddOptions) ([]string, error) {
 		return nil, err
 	}
 	tsImport := opt.TSImport
-	if tsImport == "" {
-		tsImport = defaultTSImport
-	}
 
 	type pending struct {
 		rel  string
@@ -248,7 +247,7 @@ func Add(ctx context.Context, opt AddOptions) ([]string, error) {
 		}
 		rel := key + ".tsx"
 		rels = append(rels, rel)
-		files = append(files, pending{rel: rel, body: []byte(renderTSX(tsImport, meta.pattern, name+"Page"))})
+		files = append(files, pending{rel: rel, body: []byte(renderTSX(tsImport, key, meta.pattern, name+"Page"))})
 		if opt.Style != "" {
 			style := key + "." + opt.Style
 			rels = append(rels, style)
@@ -265,7 +264,25 @@ func Add(ctx context.Context, opt AddOptions) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		body, err := renderHandler(dirPackage(dir, goRel), name, fields)
+		meta, err := classify(key)
+		if err != nil {
+			return nil, err
+		}
+		restPath := filePatternToREST(meta.pattern)
+		method := "POST"
+		if len(fields) > 0 {
+			allPath := true
+			for _, f := range fields {
+				if !f.Path {
+					allPath = false
+					break
+				}
+			}
+			if allPath {
+				method = "GET"
+			}
+		}
+		body, err := renderHandler(dirPackage(dir, goRel), name, method, restPath, fields)
 		if err != nil {
 			return nil, err
 		}
@@ -371,6 +388,7 @@ type inputField struct {
 	JSON     string
 	Required bool
 	Omit     bool
+	Path     bool
 }
 
 func inputFields(key string) ([]inputField, error) {
@@ -384,7 +402,7 @@ func inputFields(key string) ([]inputField, error) {
 					return nil, fmt.Errorf("routegen: duplicate parameter rest")
 				}
 				seen["rest"] = true
-				fields = append(fields, inputField{Name: "Rest", JSON: "rest", Omit: true})
+				fields = append(fields, inputField{Name: "Rest", JSON: "rest", Omit: true, Path: true})
 			case strings.HasPrefix(tok, "$"):
 				jsonName := tok[1:]
 				if !routeIdent(jsonName) {
@@ -394,11 +412,35 @@ func inputFields(key string) ([]inputField, error) {
 					return nil, fmt.Errorf("routegen: duplicate parameter %s", jsonName)
 				}
 				seen[jsonName] = true
-				fields = append(fields, inputField{Name: exportIdent(jsonName), JSON: jsonName, Required: true})
+				fields = append(fields, inputField{Name: exportIdent(jsonName), JSON: jsonName, Required: true, Path: true})
 			}
 		}
 	}
 	return fields, nil
+}
+
+func filePatternToREST(pattern string) string {
+	if pattern == "" {
+		return "/"
+	}
+	parts := strings.Split(strings.Trim(pattern, "/"), "/")
+	if pattern == "/" || (len(parts) == 1 && parts[0] == "") {
+		return "/"
+	}
+	for i, part := range parts {
+		if part == "$" {
+			parts[i] = "{rest}"
+			continue
+		}
+		if strings.HasPrefix(part, "$") {
+			parts[i] = "{" + part[1:] + "}"
+		}
+	}
+	out := "/" + strings.Join(parts, "/")
+	if out != "/" {
+		out = strings.TrimSuffix(out, "/")
+	}
+	return out
 }
 
 func dirPackage(routesDir, goRel string) string {
@@ -417,94 +459,58 @@ func dirPackage(routesDir, goRel string) string {
 	return packageName(base)
 }
 
-func renderHandler(pkg, name string, fields []inputField) ([]byte, error) {
-	var b strings.Builder
-	fmt.Fprintf(&b, "package %s\n\nimport \"context\"\n\n// %s handles this route.\nfunc %s(_ context.Context, _ %sIn) (%sOut, error) {\n\treturn %sOut{OK: true}, nil\n}\n\ntype %sIn struct {\n",
-		pkg, name, name, name, name, name, name)
-	for _, field := range fields {
-		fmt.Fprintf(&b, "\t%s string %s\n", field.Name, structTag(field.JSON, field.Omit, field.Required))
-	}
-	fmt.Fprintf(&b, "}\n\ntype %sOut struct {\n\tOK bool %s\n}\n", name, structTag("ok", false, false))
-	out, err := format.Source([]byte(b.String()))
-	if err != nil {
-		return nil, fmt.Errorf("routegen: format route: %w\n%s", err, b.String())
-	}
-	return out, nil
-}
-
-func structTag(jsonName string, omitempty, required bool) string {
+func structTag(jsonName string, omitempty, required, path bool) string {
 	var b strings.Builder
 	b.WriteByte('`')
-	b.WriteString("json:\"")
-	b.WriteString(jsonName)
-	if omitempty {
-		b.WriteString(",omitempty")
-	}
-	b.WriteByte('"')
-	if required {
-		b.WriteString(" route:\"required\"")
+	if path {
+		b.WriteString("path:\"")
+		b.WriteString(jsonName)
+		b.WriteByte('"')
+		if required {
+			b.WriteString(" route:\"required\"")
+		}
+	} else {
+		b.WriteString("json:\"")
+		b.WriteString(jsonName)
+		if omitempty {
+			b.WriteString(",omitempty")
+		}
+		b.WriteByte('"')
+		if required {
+			b.WriteString(" route:\"required\"")
+		}
 	}
 	b.WriteByte('`')
 	return b.String()
 }
 
-func renderTSX(tsImport, pattern, component string) string {
+func rootImport(tsImport string) string {
+	if tsImport == "" {
+		return "./" + runtimeDirName + "/index.ts"
+	}
+	return tsImport
+}
+
+func routeRuntimeImport(routeKey, tsImport string) string {
+	if tsImport != "" {
+		return tsImport
+	}
+	dir := path.Dir(routeKey)
+	if dir == "." || dir == "" {
+		return "./" + runtimeDirName + "/index.ts"
+	}
+	depth := len(strings.Split(dir, "/"))
+	return strings.Repeat("../", depth) + runtimeDirName + "/index.ts"
+}
+
+func renderTSX(tsImport, routeKey, pattern, component string) string {
 	return fmt.Sprintf("import { createFileRoute } from %s;\n\nexport const Route = createFileRoute(%s)({\n  component: function %s() {\n    return null;\n  },\n});\n",
-		strconv.Quote(tsImport), strconv.Quote(pattern), component)
+		strconv.Quote(routeRuntimeImport(routeKey, tsImport)), strconv.Quote(pattern), component)
 }
 
 func renderRoot(tsImport string) string {
 	return fmt.Sprintf("import { Outlet, createRootRoute } from %s;\n\nexport const Route = createRootRoute({\n  component: function RootLayout() {\n    return <Outlet />;\n  },\n});\n",
-		strconv.Quote(tsImport))
-}
-
-func renderMain(libPath, routesPath, routesPkg string) (string, error) {
-	libName := routeQualifier(libPath)
-	alias := routesPkg
-	if alias == libName {
-		alias = "approutes"
-	}
-	var b strings.Builder
-	b.WriteString("package main\n\nimport (\n\t\"log\"\n\t\"net/http\"\n\n")
-	fmt.Fprintf(&b, "\t%s\n", strconv.Quote(libPath))
-	if alias == routesPkg {
-		fmt.Fprintf(&b, "\t%s\n", strconv.Quote(routesPath))
-	} else {
-		fmt.Fprintf(&b, "\t%s %s\n", alias, strconv.Quote(routesPath))
-	}
-	fmt.Fprintf(&b, ")\n\nfunc main() {\n\tmux := %s.NewMux()\n\tif err := %s.RegisterAll(mux); err != nil {\n\t\tlog.Fatal(err)\n\t}\n\tsrv := &%s.Server{Mux: mux}\n\tlog.Fatal(http.ListenAndServe(\":8080\", srv))\n}\n",
-		libName, alias, libName)
-	out, err := format.Source([]byte(b.String()))
-	if err != nil {
-		return "", fmt.Errorf("routegen: format server: %w", err)
-	}
-	return string(out), nil
-}
-
-func renderGoMod(module, lib, replace string) (string, error) {
-	if err := validModulePath(module); err != nil {
-		return "", err
-	}
-	if err := validModulePath(lib); err != nil {
-		return "", err
-	}
-	var b strings.Builder
-	fmt.Fprintf(&b, "module %s\n\ngo 1.23.0\n\nrequire %s v0.0.0\n", module, lib)
-	if replace != "" {
-		abs, err := filepath.Abs(replace)
-		if err != nil {
-			return "", err
-		}
-		info, err := os.Stat(abs)
-		if err != nil {
-			return "", fmt.Errorf("routegen: replace path: %w", err)
-		}
-		if !info.IsDir() {
-			return "", fmt.Errorf("routegen: replace path %s is not a directory", abs)
-		}
-		fmt.Fprintf(&b, "\nreplace %s => %s\n", lib, goModPath(abs))
-	}
-	return b.String(), nil
+		strconv.Quote(rootImport(tsImport)))
 }
 
 func goModPath(p string) string {
@@ -514,11 +520,7 @@ func goModPath(p string) string {
 	return filepath.ToSlash(p)
 }
 
-func renderPackageJSON(name, tsImport string) string {
-	dep := tsImport
-	if dep == "" || strings.HasPrefix(dep, ".") || strings.HasPrefix(dep, "/") {
-		dep = defaultTSImport
-	}
+func renderPackageJSON(name string) string {
 	return fmt.Sprintf(`{
   "name": %s,
   "private": true,
@@ -529,7 +531,6 @@ func renderPackageJSON(name, tsImport string) string {
     "preview": "vite preview"
   },
   "dependencies": {
-    %s: "0.0.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
@@ -538,10 +539,10 @@ func renderPackageJSON(name, tsImport string) string {
     "vite": "^6.0.0"
   }
 }
-`, strconv.Quote(name), strconv.Quote(dep))
+`, strconv.Quote(name))
 }
 
-func renderEntry(tsImport, tree string) string {
+func renderEntry(runtimeImport, tree string) string {
 	return fmt.Sprintf(`import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { createRouter, RouterProvider } from %s;
@@ -557,7 +558,7 @@ if (root) {
     </StrictMode>,
   );
 }
-`, strconv.Quote(tsImport), strconv.Quote(tree))
+`, strconv.Quote(runtimeImport), strconv.Quote(tree))
 }
 
 const indexHTML = `<!doctype html>

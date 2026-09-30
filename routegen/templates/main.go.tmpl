@@ -1,0 +1,18 @@
+package main
+
+import (
+	"log"
+	"net/http"
+
+	{{.LibImport}}
+	{{.RoutesImport}}
+)
+
+func main() {
+	r := {{.LibName}}.NewRouter()
+	if err := {{.RoutesAlias}}.RegisterAll(r); err != nil {
+		log.Fatal(err)
+	}
+	srv := &{{.LibName}}.Server{Router: r}
+	log.Fatal(http.ListenAndServe(":8080", srv))
+}

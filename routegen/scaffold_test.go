@@ -22,11 +22,12 @@ func TestAddRouteFiles(t *testing.T) {
 		{
 			route: "clients/$id", tsx: "clients/$id.tsx", goRel: "clients/param_id.go",
 			pkg: "package clients", fn: "func ParamId(", pattern: `"/clients/$id"`,
-			want: []string{"json:\"id\"", "route:\"required\"", "Id string"},
+			want: []string{"path:\"id\"", "route:\"required\"", "Id string", "gnact:GET /clients/{id}"},
 		},
 		{
 			route: "clients/", tsx: "clients/index.tsx", goRel: "clients/index.go",
 			pkg: "package clients", fn: "func Index(", pattern: `"/clients/"`,
+			want: []string{"gnact:POST /clients"},
 		},
 		{
 			route: "clients/index/", tsx: "clients/index.tsx", goRel: "clients/index.go",
@@ -35,7 +36,7 @@ func TestAddRouteFiles(t *testing.T) {
 		{
 			route: "api/trpc/$", tsx: "api/trpc/$.tsx", goRel: "api/trpc/splat.go",
 			pkg: "package trpc", fn: "func Splat(", pattern: `"/api/trpc/$"`,
-			want: []string{"json:\"rest,omitempty\"", "Rest string"},
+			want: []string{"path:\"rest\"", "Rest string", "gnact:GET /api/trpc/{rest}"},
 		},
 		{
 			route: "clients/route", tsx: "clients/route.tsx", goRel: "clients/route.go",
@@ -44,7 +45,7 @@ func TestAddRouteFiles(t *testing.T) {
 		{
 			route: "clients/$id/route", tsx: "clients/$id/route.tsx", goRel: "clients/param_id/route.go",
 			pkg: "package param_id", fn: "func Route(", pattern: `"/clients/$id"`,
-			want: []string{"json:\"id\"", "route:\"required\""},
+			want: []string{"path:\"id\"", "route:\"required\"", "gnact:GET /clients/{id}"},
 		},
 		{
 			route: "_auth", tsx: "_auth.tsx", goRel: "pathless_auth.go",
@@ -57,11 +58,12 @@ func TestAddRouteFiles(t *testing.T) {
 		{
 			route: "posts.$postId", tsx: "posts.$postId.tsx", goRel: "posts.param_postId.go",
 			pkg: "package routes", fn: "func ParamPostId(", pattern: `"/posts/$postId"`,
-			want: []string{"json:\"postId\"", "route:\"required\"", "PostId string"},
+			want: []string{"path:\"postId\"", "route:\"required\"", "PostId string", "gnact:GET /posts/{postId}"},
 		},
 		{
 			route: "/", tsx: "index.tsx", goRel: "index.go",
 			pkg: "package routes", fn: "func Index(", pattern: `"/"`,
+			want: []string{"gnact:POST /"},
 		},
 	}
 	for _, tc := range cases {
@@ -191,6 +193,8 @@ func TestInitAppBuilds(t *testing.T) {
 		"routes/register.gen.go",
 		"routes/routeTree.gen.tsx",
 		"routes/index.gen.ts",
+		"routes/gnact/client.ts",
+		"routes/gnact/index.ts",
 	} {
 		if !strings.Contains(joined, rel) {
 			t.Fatalf("missing %s in %s", rel, joined)
@@ -203,16 +207,23 @@ func TestInitAppBuilds(t *testing.T) {
 	if !strings.Contains(mod, "module example.com/app") || !strings.Contains(mod, "replace github.com/yurimoinhos/go-n-act =>") {
 		t.Fatalf("go.mod = %s", mod)
 	}
+	pkg := readText(t, filepath.Join(dir, "package.json"))
+	if strings.Contains(pkg, "@aggitech/route") || strings.Contains(pkg, "go-n-act") || strings.Contains(pkg, "gnact") {
+		t.Fatalf("package.json must not depend on gnact: %s", pkg)
+	}
+	if !strings.Contains(pkg, `"react"`) || !strings.Contains(pkg, `"vite"`) {
+		t.Fatalf("package.json = %s", pkg)
+	}
 	server := readText(t, filepath.Join(dir, "cmd", "server", "main.go"))
 	if !strings.Contains(server, "\":8080\"") || !strings.Contains(server, "RegisterAll") {
 		t.Fatalf("server = %s", server)
 	}
 	entry := readText(t, filepath.Join(dir, "src", "main.tsx"))
-	if !strings.Contains(entry, `from "../routes/routeTree.gen"`) || !strings.Contains(entry, "createRouter") {
+	if !strings.Contains(entry, `from "../routes/routeTree.gen"`) || !strings.Contains(entry, "createRouter") || !strings.Contains(entry, "routes/gnact/index.ts") {
 		t.Fatalf("entry = %s", entry)
 	}
 	root := readText(t, filepath.Join(dir, "routes", "__root.tsx"))
-	if !strings.Contains(root, "createRootRoute") || !strings.Contains(root, "Outlet") {
+	if !strings.Contains(root, "createRootRoute") || !strings.Contains(root, "Outlet") || !strings.Contains(root, "./gnact/index.ts") {
 		t.Fatalf("root = %s", root)
 	}
 	cmd := exec.Command("go", "build", "-o", filepath.Join(t.TempDir(), "server"), "./cmd/server")

@@ -17,8 +17,9 @@ import (
 const (
 	// DefaultImport is the Go import path written into generated registers.
 	DefaultImport = "github.com/yurimoinhos/go-n-act"
-	// DefaultTS is the TypeScript specifier written into generated clients.
-	DefaultTS = "@aggitech/route"
+	// DefaultTS is empty: codegen embeds the runtime under routes/gnact/.
+	// Pass an explicit npm specifier only when you intentionally override that.
+	DefaultTS = ""
 )
 
 // ErrHelp means the process should exit 0 after usage was written to stdout.
