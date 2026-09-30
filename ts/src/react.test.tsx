@@ -85,3 +85,26 @@ test("Link prevents an unmodified left click and ignores a modified click", asyn
   });
   expect(prevented).toBe(false);
 });
+
+test("RouterProvider loads the current location on mount", async () => {
+  const root = createRootRoute({
+    component: () => <Outlet />,
+  });
+  const home = createFileRoute("/")({
+    loader: () => "carregado",
+    component: function Home() {
+      return <p>{home.useLoaderData()}</p>;
+    },
+  });
+  root.addChildren([home]);
+  const router = createRouter({ routeTree: root });
+  expect(router.state.matches).toEqual([]);
+  let renderer = create(<></>);
+  await act(async () => {
+    renderer = create(<RouterProvider router={router} />);
+  });
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+  expect(JSON.stringify(renderer.toJSON())).toContain("carregado");
+});

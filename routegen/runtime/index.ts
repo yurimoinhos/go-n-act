@@ -1,6 +1,7 @@
 import "./react.tsx";
 
 export {
+  BrowserHistory,
   MemoryHistory,
   NotFoundError,
   Redirect,
@@ -13,6 +14,8 @@ export {
   parseLocation,
   redirect,
   type AnyRoute,
+  type BrowserWindow,
+  type RouterHistory,
   type Match,
   type NavigateOptions,
   type ParsedLocation,
