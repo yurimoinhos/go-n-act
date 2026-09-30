@@ -177,6 +177,27 @@ func TestPlanGoParamFile(t *testing.T) {
 	}
 }
 
+func TestPlanGoPathlessFile(t *testing.T) {
+	routes, err := Plan([]string{
+		"_auth.tsx",
+		"pathless_auth.go",
+		"_auth.login.tsx",
+		"pathless_auth.login.go",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	by := indexRoutes(routes)
+	auth := by["_auth"]
+	if !auth.HasTSX || !auth.HasGo || auth.GoRel != "pathless_auth.go" || auth.Kind != KindPathless || auth.Service != "route.pathless_auth.v1" {
+		t.Fatalf("pathless file = %+v", auth)
+	}
+	login := by["_auth.login"]
+	if !login.HasTSX || !login.HasGo || login.GoRel != "pathless_auth.login.go" || login.Pattern != "/login" || login.ParentKey != "_auth" {
+		t.Fatalf("dotted pathless = %+v", login)
+	}
+}
+
 func indexRoutes(routes []Route) map[string]Route {
 	by := map[string]Route{}
 	for _, route := range routes {

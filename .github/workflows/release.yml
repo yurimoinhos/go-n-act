@@ -1,0 +1,29 @@
+name: release
+
+on:
+  push:
+    branches: [master]
+
+permissions:
+  contents: write
+
+jobs:
+  module:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Tag the next semver
+        id: tag
+        env:
+          GNACT_TAG: "1"
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          ver=$(.github/release-version.sh)
+          echo "version=${ver}" >> "$GITHUB_OUTPUT"
+      - name: Register the version on the Go module proxy
+        run: |
+          curl --retry 5 --retry-delay 2 --retry-all-errors --fail-with-body \
+            "https://proxy.golang.org/github.com/yurimoinhos/go-n-act/@v/${{ steps.tag.outputs.version }}.info"

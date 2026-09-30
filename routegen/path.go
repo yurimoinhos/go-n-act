@@ -136,7 +136,10 @@ func Plan(rels []string) ([]Route, error) {
 
 // goStemToRoute maps a Go file stem onto the route key shared with .tsx files.
 // The compiler rejects '$' in a file name, so param_<name>.go is the /$<name>
-// route and splat.go is the splat segment.
+// route and splat.go is the splat segment. The go tool ignores a file whose
+// name starts with '_', so pathless_<name>.go is the /_<name> route.
+// A static segment literally named param_<name>, splat, or pathless_<name>
+// is rewritten the same way.
 func goStemToRoute(stem string) string {
 	parts := strings.Split(stem, "/")
 	for i, part := range parts {
@@ -153,9 +156,11 @@ func goTokenToRoute(token string) string {
 	if token == "splat" {
 		return "$"
 	}
-	rest, ok := strings.CutPrefix(token, "param_")
-	if ok && routeIdent(rest) {
+	if rest, ok := strings.CutPrefix(token, "param_"); ok && routeIdent(rest) {
 		return "$" + rest
+	}
+	if rest, ok := strings.CutPrefix(token, "pathless_"); ok && routeIdent(rest) {
+		return "_" + rest
 	}
 	return token
 }

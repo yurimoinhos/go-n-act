@@ -95,6 +95,26 @@ func TestGenerateRejectsDollarDirectory(t *testing.T) {
 	}
 }
 
+func TestGenerateRejectsUnderscoreFile(t *testing.T) {
+	dir := t.TempDir()
+	routes := filepath.Join(dir, "routes")
+	writeFile(t, filepath.Join(routes, "_auth.go"), "package routes\n")
+	_, err := Generate(context.Background(), Options{Dir: routes})
+	if err == nil || !strings.Contains(err.Error(), "pathless_auth.go") || !strings.Contains(err.Error(), "ignores") || strings.Contains(err.Error(), "go.mod") {
+		t.Fatal(err)
+	}
+}
+
+func TestGenerateAllowsUnderscoreDirectory(t *testing.T) {
+	dir := t.TempDir()
+	routes := filepath.Join(dir, "routes")
+	writeFile(t, filepath.Join(dir, "go.mod"), "module example.com/app\n\ngo 1.23.0\n")
+	writeFile(t, filepath.Join(routes, "_auth", "login.go"), "package pathless_auth\n\nfunc Login() {}\n")
+	if _, err := Generate(context.Background(), Options{Dir: routes}); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestGenerateRejectsRoutePath(t *testing.T) {
 	dir := t.TempDir()
 	routes := filepath.Join(dir, "routes")

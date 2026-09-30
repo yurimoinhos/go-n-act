@@ -8,13 +8,15 @@ O router segue o modelo de rotas por arquivo: caminho completo, layout, index, p
 
 ```bash
 go get github.com/yurimoinhos/go-n-act
-go install github.com/yurimoinhos/go-n-act/cmd/routegen@latest
+go install github.com/yurimoinhos/go-n-act/cmd/gnact@latest
 ```
 
-No diretório `routes` do projeto:
+Cada push em `master` recebe uma tag semver. `feat` sobe o minor, o restante sobe o patch, e a primeira tag é `v0.1.0`. A Action publica a tag e pede ao `proxy.golang.org` para indexar o módulo, que então aparece em `pkg.go.dev/github.com/yurimoinhos/go-n-act`. Uma major `v2` não é criada sozinha: o caminho do módulo teria de mudar.
+
+No diretório do projeto:
 
 ```bash
-routegen -dir routes -import_path example.com/app/routes -ts_import @aggitech/route
+gnact routegen -dir routes
 ```
 
 No `main` do servidor:
@@ -50,6 +52,7 @@ A chave da rota é o caminho do arquivo sem extensão.
 | `api/trpc/$.tsx` | `/api/trpc/$` | `route.api.trpc.splat.v1` |
 | `posts.$postId.tsx` | `/posts/$postId` | `route.posts.param_postId.v1` |
 | `_auth.tsx` | segmento sem URL `/_auth` | `route.pathless_auth.v1` |
+| `_auth.login.tsx` | `/login` sob `/_auth` | `route.login.v1` |
 
 `createFileRoute` recebe o caminho completo da URL. Index termina com `/`. O layout do mesmo diretório não termina. O layout raiz é só `__root.tsx`. Um `route.tsx` na raiz de `routes` é erro, porque também seria a URL `/`.
 
@@ -64,10 +67,16 @@ O compilador rejeita `$` no nome do arquivo, e um import path rejeita `$` no dir
 | UI | Go |
 | --- | --- |
 | `clients/$id.tsx` | `clients/param_id.go` |
+| `clients/$id/route.tsx` | `clients/param_id/route.go` |
 | `api/trpc/$.tsx` | `api/trpc/splat.go` |
 | `posts.$postId.tsx` | `posts.param_postId.go` |
+| `_auth.tsx` | `pathless_auth.go` |
+| `_auth.login.tsx` | `pathless_auth.login.go` |
+| `_auth/login.tsx` | `_auth/login.go` |
 
-Um diretório chamado `$id` não pode conter `.go`. O gerador pede para renomear antes de procurar o `go.mod`.
+Um diretório chamado `$id` não pode conter `.go`. O gerador pede para renomear antes de procurar o `go.mod`. Um arquivo cujo nome começa com `_` também é recusado, porque o go tool ignora esse nome. O diretório `_auth` continua válido.
+
+Um segmento estático com nome literal `param_<nome>`, `splat` ou `pathless_<nome>` é reescrito para `$<nome>`, `$` ou `_<nome>`.
 
 Um handler é uma função exportada, sem receiver, com uma destas formas:
 
@@ -139,16 +148,74 @@ No router, `navigate` aceita só caminho. URL absoluta e URL protocol-relative (
 
 ## CLI
 
-`routegen` usa a flag da biblioteca padrão. Flags só no `main`.
+O binário é `gnact`. Cada módulo é um subcomando, registrado no processo: `routegen`, `template` e `test`. Sem módulo, `gnact` escreve a lista na stdout e sai com código 0. `gnact help <módulo>` escreve as flags daquele módulo. Flag desconhecida, módulo desconhecido ou argumento a mais saem com código 2, sem repetir a ajuda inteira. Falha ao gerar, ao escrever ou no `go test` sai com código 1. A lista de arquivos criados por `template` sai na stdout, um caminho por linha.
+
+### routegen
+
+`gnact routegen` escreve o cliente, os registers e a árvore. Sem argumentos, o comportamento é o de `generate`. `gnact routegen generate` é o mesmo comando.
 
 | Flag | Padrão | Uso |
 | --- | --- | --- |
 | `-dir` | `routes` | diretório das rotas |
 | `-check` | `false` | compara os arquivos gerados e não escreve |
-| `-import_path` | `github.com/yurimoinhos/go-n-act` | import Go escrito no register |
+| `-import_path` | `github.com/yurimoinhos/go-n-act` | import Go deste módulo, escrito no register |
 | `-ts_import` | `@aggitech/route` | módulo TypeScript |
 
-Argumento extra termina com código 2. Erro de geração termina com código 1. `-check` em silêncio significa que o disco está igual. Arquivo gerenciado a mais (`register.gen.go`, `routeTree.gen.tsx`, `*.gen.ts` com o cabeçalho do gerador) também falha o check. Sem `-check`, esses arquivos sobrando são apagados.
+`-check` em silêncio significa que o disco está igual. Arquivo gerenciado a mais (`register.gen.go`, `routeTree.gen.tsx`, `*.gen.ts` com o cabeçalho do gerador) também falha o check. Sem `-check`, esses arquivos sobrando são apagados.
+
+### template
+
+`gnact template init [dir]` cria um app ou só a pasta de rotas. `dir` vazio é o diretório atual.
+
+| Flag | Padrão | Uso |
+| --- | --- | --- |
+| `-template` | `app` | `app` ou `routes` |
+| `-module` | `example.com/app` se `dir` é `.`, senão `example.com/<nome>` | caminho do módulo novo |
+| `-dir` | `routes` | pasta das rotas, relativa ao projeto |
+| `-replace` | desligado | escreve `replace` no `go.mod` apontando para este módulo local |
+| `-import_path` | `github.com/yurimoinhos/go-n-act` | import Go deste módulo |
+| `-ts_import` | `@aggitech/route` | módulo TypeScript |
+
+`app` escreve `go.mod` (`go 1.23.0`), `cmd/server/main.go`, `package.json`, `index.html`, `src/main.tsx`, `vite.config.ts`, `.gitignore` e as rotas `__root.tsx`, `index.tsx` e `index.go`. O servidor escuta em `:8080`. A UI mínima monta `routeTree.gen` com `createRouter`. O comando não instala dependências do npm.
+
+`routes` escreve só `__root.tsx`, `index.tsx` e `index.go` dentro de um módulo que já existe. Se houver `go.mod` acima da pasta, o gerador roda em seguida.
+
+`init` recusa `go.mod` existente no template `app`, a pasta de rotas de destino desse template, e qualquer arquivo que ele próprio escreveria.
+
+`gnact template new <rota>` cria uma rota. A chave segue o nome do arquivo, com `/` inicial opcional. Barra no final vira index, exceto quando o último segmento já é `index`.
+
+| Exemplo | Arquivos |
+| --- | --- |
+| `about` | `about.tsx`, `about.go` |
+| `clients/` | `clients/index.tsx`, `clients/index.go` |
+| `clients/route` | layout `clients/route.tsx`, `clients/route.go` |
+| `clients/$id` | `clients/$id.tsx`, `clients/param_id.go` |
+| `clients/$id/route` | `clients/$id/route.tsx`, `clients/param_id/route.go` |
+| `api/trpc/$` | `api/trpc/$.tsx`, `api/trpc/splat.go` |
+| `posts.$postId` | `posts.$postId.tsx`, `posts.param_postId.go` |
+| `_auth` | `_auth.tsx`, `pathless_auth.go` |
+| `_auth/login` | `_auth/login.tsx`, `_auth/login.go` |
+
+| Flag | Padrão | Uso |
+| --- | --- | --- |
+| `-dir` | `routes` | diretório das rotas |
+| `-only` | `both` | `both`, `ui` ou `api` |
+| `-style` | vazio | `css`, `scss` ou `sass`, no mesmo nome do `.tsx` |
+| `-generate` | `true` | escreve cliente, registers e árvore |
+| `-import_path` | `github.com/yurimoinhos/go-n-act` | import Go deste módulo |
+| `-ts_import` | `@aggitech/route` | módulo TypeScript |
+
+`-style` com `-only api` é erro. A rota `route` na raiz e a rota `__root` são erro: o layout raiz é `__root.tsx`. Arquivo que já existe não é sobrescrito. O `.tsx` chama `createFileRoute` com o caminho completo. O `.go` exporta um handler com o nome do último segmento e um comentário que o gerador copia. Parâmetro vira campo `route:"required"`. Splat vira `Rest` com `json:"rest,omitempty"`.
+
+### test
+
+`gnact test` compara os arquivos gerados com o disco e, se estiverem iguais, roda `go test ./...` no módulo que contém a pasta de rotas. Não escreve geração. A saída do `go test` vai para stdout e stderr.
+
+| Flag | Padrão | Uso |
+| --- | --- | --- |
+| `-dir` | `routes` | diretório das rotas |
+| `-import_path` | `github.com/yurimoinhos/go-n-act` | import Go usado na comparação |
+| `-ts_import` | `@aggitech/route` | módulo TypeScript usado na comparação |
 
 Cada package Go ganha `Register`. A raiz ganha `RegisterAll`, que chama os filhos e o `Register` local quando a raiz tem endpoint.
 
@@ -178,6 +245,7 @@ Os hooks `useLoaderData`, `useParams` e `useSearch` existem no objeto da rota de
 - Nil dentro de um map não é normalizado.
 - Handlers exportados no mesmo diretório precisam de nomes únicos.
 - Arquivo e diretório Go não podem conter `$`. Use `param_<nome>.go` e `splat.go`.
+- Arquivo Go não pode começar com `_`. Use `pathless_<nome>.go` ao lado de `_<nome>.tsx`. Diretório `_auth` pode conter `.go`.
 - Uma função exportada com a assinatura de handler é um endpoint.
 - Enum precisa ser constante exportada de um tipo nomeado.
 - O layout raiz é `__root.tsx`, não `route.tsx`.
