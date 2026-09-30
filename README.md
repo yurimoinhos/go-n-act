@@ -1,25 +1,25 @@
 # route
 
-Biblioteca para rotas colocadas. Cada rota é um arquivo `.tsx` e, quando a rota tem servidor, um arquivo `.go` no mesmo diretório. O `.go` é o único endpoint daquela rota. A UI chama esse endpoint pelo cliente gerado, em HTTP/1.1 com JSON.
+Library for colocated routes. Each route is a `.tsx` file and, when the route has a server, a `.go` file in the same directory. The `.go` file is the only endpoint for that route. The UI calls that endpoint through the generated client, over HTTP/1.1 with JSON.
 
-O router segue o modelo de rotas por arquivo: caminho completo, layout, index, parâmetro, splat, segmento sem URL, loader e `beforeLoad`. Não depende do TanStack Router. React é dependência opcional do entry da UI.
+The router follows the file-based route model: full path, layout, index, parameter, splat, pathless segment, loader, and `beforeLoad`. It does not depend on TanStack Router. React is an optional dependency of the UI entry.
 
-## Começar
+## Getting started
 
 ```bash
 go get github.com/yurimoinhos/go-n-act
 go install github.com/yurimoinhos/go-n-act/cmd/gnact@latest
 ```
 
-Cada push em `master` recebe uma tag semver. `feat` sobe o minor, o restante sobe o patch, e a primeira tag é `v0.1.0`. A Action publica a tag e pede ao `proxy.golang.org` para indexar o módulo, que então aparece em `pkg.go.dev/github.com/yurimoinhos/go-n-act`. Uma major `v2` não é criada sozinha: o caminho do módulo teria de mudar.
+Every push to `master` gets a semver tag. `feat` bumps the minor, everything else bumps the patch, and the first tag is `v0.1.0`. The Action publishes the tag and asks `proxy.golang.org` to index the module, which then appears at `pkg.go.dev/github.com/yurimoinhos/go-n-act`. A major `v2` is not created automatically: the module path would have to change.
 
-No diretório do projeto:
+In the project directory:
 
 ```bash
 gnact routegen -dir routes
 ```
 
-No `main` do servidor:
+In the server `main`:
 
 ```go
 mux := route.NewMux()
@@ -34,15 +34,15 @@ log.Fatal(http.ListenAndServe(":8080", &route.Server{
 }))
 ```
 
-Na UI, importe a árvore gerada e o entry `@aggitech/route`. O cliente gerado importa `@aggitech/route/client`, então o bundle que só chama o servidor não puxa o React.
+In the UI, import the generated tree and the `@aggitech/route` entry. The generated client imports `@aggitech/route/client`, so a bundle that only calls the server does not pull in React.
 
-## Arquivos de rota
+## Route files
 
-A chave da rota é o caminho do arquivo sem extensão.
+The route key is the file path without the extension.
 
-| Arquivo | URL | Serviço |
+| File | URL | Service |
 | --- | --- | --- |
-| `__root.tsx` | layout raiz | `route.root.v1` |
+| `__root.tsx` | root layout | `route.root.v1` |
 | `index.tsx` | `/` | `route.index.v1` |
 | `about.tsx` | `/about` | `route.about.v1` |
 | `clients/route.tsx` | `/clients` | `route.clients.layout.v1` |
@@ -51,18 +51,18 @@ A chave da rota é o caminho do arquivo sem extensão.
 | `clients/$id/route.tsx` | `/clients/$id` (layout) | `route.clients.param_id.layout.v1` |
 | `api/trpc/$.tsx` | `/api/trpc/$` | `route.api.trpc.splat.v1` |
 | `posts.$postId.tsx` | `/posts/$postId` | `route.posts.param_postId.v1` |
-| `_auth.tsx` | segmento sem URL `/_auth` | `route.pathless_auth.v1` |
-| `_auth.login.tsx` | `/login` sob `/_auth` | `route.login.v1` |
+| `_auth.tsx` | pathless segment `/_auth` | `route.pathless_auth.v1` |
+| `_auth.login.tsx` | `/login` under `/_auth` | `route.login.v1` |
 
-`createFileRoute` recebe o caminho completo da URL. Index termina com `/`. O layout do mesmo diretório não termina. O layout raiz é só `__root.tsx`. Um `route.tsx` na raiz de `routes` é erro, porque também seria a URL `/`.
+`createFileRoute` takes the full URL path. Index ends with `/`. The layout for the same directory does not. The root layout is only `__root.tsx`. A `route.tsx` at the root of `routes` is an error, because it would also be the URL `/`.
 
-Um `.css`, `.scss` ou `.sass` ao lado da rota entra na árvore como import de efeito. A ordem é `.css`, depois `.scss`, depois `.sass`.
+A `.css`, `.scss`, or `.sass` file next to the route enters the tree as a side-effect import. The order is `.css`, then `.scss`, then `.sass`.
 
-Arquivo só com `.go` vira endpoint e cliente, e não entra na árvore do router. Arquivo só com `.tsx` é rota de UI. `*_test.go`, `doc.go` e `*.gen.*` são ignorados.
+A file with only `.go` becomes an endpoint and client, and does not enter the router tree. A file with only `.tsx` is a UI route. `*_test.go`, `doc.go`, and `*.gen.*` are ignored.
 
-## Endpoints Go
+## Go endpoints
 
-O compilador rejeita `$` no nome do arquivo, e um import path rejeita `$` no diretório. A UI continua com `$id.tsx`. O endpoint fica ao lado, com outro nome:
+The compiler rejects `$` in a file name, and an import path rejects `$` in a directory. The UI keeps `$id.tsx`. The endpoint sits beside it, under a different name:
 
 | UI | Go |
 | --- | --- |
@@ -74,11 +74,11 @@ O compilador rejeita `$` no nome do arquivo, e um import path rejeita `$` no dir
 | `_auth.login.tsx` | `pathless_auth.login.go` |
 | `_auth/login.tsx` | `_auth/login.go` |
 
-Um diretório chamado `$id` não pode conter `.go`. O gerador pede para renomear antes de procurar o `go.mod`. Um arquivo cujo nome começa com `_` também é recusado, porque o go tool ignora esse nome. O diretório `_auth` continua válido.
+A directory named `$id` cannot contain `.go`. The generator asks you to rename it before looking for `go.mod`. A file whose name starts with `_` is also rejected, because the go tool ignores that name. The `_auth` directory remains valid.
 
-Um segmento estático com nome literal `param_<nome>`, `splat` ou `pathless_<nome>` é reescrito para `$<nome>`, `$` ou `_<nome>`.
+A static segment with the literal name `param_<name>`, `splat`, or `pathless_<name>` is rewritten to `$<name>`, `$`, or `_<name>`.
 
-Um handler é uma função exportada, sem receiver, com uma destas formas:
+A handler is an exported function, with no receiver, in one of these forms:
 
 ```go
 func(ctx context.Context, in T) (R, error)
@@ -87,23 +87,23 @@ func(ctx context.Context) (R, error)
 func(ctx context.Context) error
 ```
 
-`T` e `R` são structs, ou ponteiro para struct. Funções que não têm essa forma são ignoradas. Uma função exportada que tem essa forma é um endpoint, mesmo que o nome do arquivo pareça um helper.
+`T` and `R` are structs, or pointers to structs. Functions that do not match this form are ignored. An exported function that matches this form is an endpoint, even if the file name looks like a helper.
 
-Nomes de handler são únicos dentro do diretório, porque os arquivos dividem o mesmo package Go.
+Handler names are unique within the directory, because the files share the same Go package.
 
-O principal vem só de `Server.Authenticate`, pelo context. O JSON não define identidade.
+The principal comes only from `Server.Authenticate`, through the context. The JSON does not define identity.
 
 Tags:
 
-- `json:"nome"` é o contrato.
-- `route:"server"` existe na resposta quando a struct volta do handler, e é rejeitado se o cliente enviar o campo. A resposta pública continua `invalid request`.
-- `route:"required"` exige a chave no JSON. Zero e `false` são válidos. A mensagem pública inclui o nome JSON, por exemplo `missing field id`.
-- `json:"-"` e `route:"-"` ficam de fora.
-- Campo desconhecido é `invalid request`.
+- `json:"name"` is the contract.
+- `route:"server"` exists on the response when the struct is returned from the handler, and is rejected if the client sends the field. The public response remains `invalid request`.
+- `route:"required"` requires the key in the JSON. Zero and `false` are valid. The public message includes the JSON name, for example `missing field id`.
+- `json:"-"` and `route:"-"` are left out.
+- An unknown field is `invalid request`.
 
-`*route.Error` é público: o cliente vê `code` e `message`. Qualquer outro erro, inclusive panic, vira `internal` / `internal error`. O texto real chega só em `OnError`.
+`*route.Error` is public: the client sees `code` and `message`. Any other error, including panic, becomes `internal` / `internal error`. The real text reaches only `OnError`.
 
-Um enum no TypeScript é um conjunto de constantes exportadas de um tipo nomeado:
+A TypeScript enum is a set of exported constants of a named type:
 
 ```go
 type Role string
@@ -114,77 +114,77 @@ const (
 )
 ```
 
-Isso gera `"admin" | "user"`.
+This generates `"admin" | "user"`.
 
 ## HTTP
 
-`POST /rpc/{service}/{method}`. O corpo é o objeto JSON. Corpo vazio vira `{}`. Sucesso `200` devolve o JSON do handler, sem envelope. Handler sem saída devolve `{}`.
+`POST /rpc/{service}/{method}`. The body is the JSON object. An empty body becomes `{}`. A successful `200` returns the handler JSON, with no envelope. A handler with no output returns `{}`.
 
-Erro:
+Error:
 
 ```json
 {"code":"invalid_argument","message":"missing field id"}
 ```
 
-Procedimento desconhecido responde `404` com `not found` e não lista os métodos. `GET` num procedimento conhecido responde `405`.
+An unknown procedure responds `404` with `not found` and does not list methods. `GET` on a known procedure responds `405`.
 
-`Content-Type` vazio ou `application/json`. O corpo padrão cabe em 1 MiB. Acima disso, `413`. `Cache-Control: no-store` e `X-Content-Type-Options: nosniff`.
+`Content-Type` is empty or `application/json`. The default body fits in 1 MiB. Above that, `413`. `Cache-Control: no-store` and `X-Content-Type-Options: nosniff`.
 
-Slice e map nil saem como `[]` e `{}`. Valor nil dentro de um map não é normalizado.
+Nil slices and maps go out as `[]` and `{}`. A nil value inside a map is not normalized.
 
-## Segurança
+## Security
 
-O mux é uma allowlist. Só entra quem foi registrado.
+The mux is an allowlist. Only what was registered gets in.
 
-Chamada sem `Origin` é cliente não-browser e passa. Com `Origin`, o valor tem de ser `scheme://Host` desta requisição, ou um item de `AllowedOrigins`. Nunca `*` e nunca `null`. Além do `Origin`, o browser precisa enviar `X-Route-Request: 1`. Sem esse header, a resposta é `403`.
+A call without `Origin` is a non-browser client and passes. With `Origin`, the value must be `scheme://Host` of this request, or an item in `AllowedOrigins`. Never `*` and never `null`. Besides `Origin`, the browser must send `X-Route-Request: 1`. Without that header, the response is `403`.
 
-CORS usa credencial, `Vary: Origin`, preflight `OPTIONS` com `204`, `Allow-Headers` incluindo `Content-Type` e `X-Route-Request`, e `Max-Age` 600.
+CORS uses credentials, `Vary: Origin`, preflight `OPTIONS` with `204`, `Allow-Headers` including `Content-Type` and `X-Route-Request`, and `Max-Age` 600.
 
-O cliente gerado manda `Content-Type: application/json` e `X-Route-Request: 1`. Com `baseURL` vazio a credencial é `same-origin`. Com base absoluta, é `include`. A barra final do `baseURL` é removida.
+The generated client sends `Content-Type: application/json` and `X-Route-Request: 1`. With an empty `baseURL`, credentials are `same-origin`. With an absolute base, they are `include`. A trailing slash on `baseURL` is stripped.
 
-Resposta que não é JSON vira `ClientError` com mensagem `invalid response`. O corpo não é copiado para o erro.
+A non-JSON response becomes `ClientError` with message `invalid response`. The body is not copied into the error.
 
-No router, `navigate` aceita só caminho. URL absoluta e URL protocol-relative (`//host`) falham com `navigation href must be a path`.
+In the router, `navigate` accepts only a path. Absolute URLs and protocol-relative URLs (`//host`) fail with `navigation href must be a path`.
 
 ## CLI
 
-O binário é `gnact`. Cada módulo é um subcomando, registrado no processo: `routegen`, `template` e `test`. Sem módulo, `gnact` escreve a lista na stdout e sai com código 0. `gnact help <módulo>` escreve as flags daquele módulo. Flag desconhecida, módulo desconhecido ou argumento a mais saem com código 2, sem repetir a ajuda inteira. Falha ao gerar, ao escrever ou no `go test` sai com código 1. A lista de arquivos criados por `template` sai na stdout, um caminho por linha.
+The binary is `gnact`. Each module is a subcommand, registered in-process: `routegen`, `template`, and `test`. With no module, `gnact` writes the list to stdout and exits with code 0. `gnact help <module>` writes that module's flags. An unknown flag, unknown module, or extra argument exits with code 2, without repeating the full help. Failure to generate, write, or run `go test` exits with code 1. The list of files created by `template` goes to stdout, one path per line.
 
 ### routegen
 
-`gnact routegen` escreve o cliente, os registers e a árvore. Sem argumentos, o comportamento é o de `generate`. `gnact routegen generate` é o mesmo comando.
+`gnact routegen` writes the client, the registers, and the tree. With no arguments, the behavior is that of `generate`. `gnact routegen generate` is the same command.
 
-| Flag | Padrão | Uso |
+| Flag | Default | Use |
 | --- | --- | --- |
-| `-dir` | `routes` | diretório das rotas |
-| `-check` | `false` | compara os arquivos gerados e não escreve |
-| `-import_path` | `github.com/yurimoinhos/go-n-act` | import Go deste módulo, escrito no register |
-| `-ts_import` | `@aggitech/route` | módulo TypeScript |
+| `-dir` | `routes` | routes directory |
+| `-check` | `false` | compare generated files and do not write |
+| `-import_path` | `github.com/yurimoinhos/go-n-act` | Go import of this module, written into the register |
+| `-ts_import` | `@aggitech/route` | TypeScript module |
 
-`-check` em silêncio significa que o disco está igual. Arquivo gerenciado a mais (`register.gen.go`, `routeTree.gen.tsx`, `*.gen.ts` com o cabeçalho do gerador) também falha o check. Sem `-check`, esses arquivos sobrando são apagados.
+Silent `-check` means the disk matches. An extra managed file (`register.gen.go`, `routeTree.gen.tsx`, `*.gen.ts` with the generator header) also fails the check. Without `-check`, those leftover files are deleted.
 
 ### template
 
-`gnact template init [dir]` cria um app ou só a pasta de rotas. `dir` vazio é o diretório atual.
+`gnact template init [dir]` creates an app or only the routes folder. An empty `dir` is the current directory.
 
-| Flag | Padrão | Uso |
+| Flag | Default | Use |
 | --- | --- | --- |
-| `-template` | `app` | `app` ou `routes` |
-| `-module` | `example.com/app` se `dir` é `.`, senão `example.com/<nome>` | caminho do módulo novo |
-| `-dir` | `routes` | pasta das rotas, relativa ao projeto |
-| `-replace` | desligado | escreve `replace` no `go.mod` apontando para este módulo local |
-| `-import_path` | `github.com/yurimoinhos/go-n-act` | import Go deste módulo |
-| `-ts_import` | `@aggitech/route` | módulo TypeScript |
+| `-template` | `app` | `app` or `routes` |
+| `-module` | `example.com/app` if `dir` is `.`, otherwise `example.com/<name>` | new module path |
+| `-dir` | `routes` | routes folder, relative to the project |
+| `-replace` | off | writes a `replace` in `go.mod` pointing at this local module |
+| `-import_path` | `github.com/yurimoinhos/go-n-act` | Go import of this module |
+| `-ts_import` | `@aggitech/route` | TypeScript module |
 
-`app` escreve `go.mod` (`go 1.23.0`), `cmd/server/main.go`, `package.json`, `index.html`, `src/main.tsx`, `vite.config.ts`, `.gitignore` e as rotas `__root.tsx`, `index.tsx` e `index.go`. O servidor escuta em `:8080`. A UI mínima monta `routeTree.gen` com `createRouter`. O comando não instala dependências do npm.
+`app` writes `go.mod` (`go 1.23.0`), `cmd/server/main.go`, `package.json`, `index.html`, `src/main.tsx`, `vite.config.ts`, `.gitignore`, and the routes `__root.tsx`, `index.tsx`, and `index.go`. The server listens on `:8080`. The minimal UI mounts `routeTree.gen` with `createRouter`. The command does not install npm dependencies.
 
-`routes` escreve só `__root.tsx`, `index.tsx` e `index.go` dentro de um módulo que já existe. Se houver `go.mod` acima da pasta, o gerador roda em seguida.
+`routes` writes only `__root.tsx`, `index.tsx`, and `index.go` inside an existing module. If there is a `go.mod` above the folder, the generator runs afterward.
 
-`init` recusa `go.mod` existente no template `app`, a pasta de rotas de destino desse template, e qualquer arquivo que ele próprio escreveria.
+`init` refuses an existing `go.mod` for the `app` template, that template's destination routes folder, and any file it would itself write.
 
-`gnact template new <rota>` cria uma rota. A chave segue o nome do arquivo, com `/` inicial opcional. Barra no final vira index, exceto quando o último segmento já é `index`.
+`gnact template new <route>` creates a route. The key follows the file name, with an optional leading `/`. A trailing slash becomes index, except when the last segment is already `index`.
 
-| Exemplo | Arquivos |
+| Example | Files |
 | --- | --- |
 | `about` | `about.tsx`, `about.go` |
 | `clients/` | `clients/index.tsx`, `clients/index.go` |
@@ -196,57 +196,57 @@ O binário é `gnact`. Cada módulo é um subcomando, registrado no processo: `r
 | `_auth` | `_auth.tsx`, `pathless_auth.go` |
 | `_auth/login` | `_auth/login.tsx`, `_auth/login.go` |
 
-| Flag | Padrão | Uso |
+| Flag | Default | Use |
 | --- | --- | --- |
-| `-dir` | `routes` | diretório das rotas |
-| `-only` | `both` | `both`, `ui` ou `api` |
-| `-style` | vazio | `css`, `scss` ou `sass`, no mesmo nome do `.tsx` |
-| `-generate` | `true` | escreve cliente, registers e árvore |
-| `-import_path` | `github.com/yurimoinhos/go-n-act` | import Go deste módulo |
-| `-ts_import` | `@aggitech/route` | módulo TypeScript |
+| `-dir` | `routes` | routes directory |
+| `-only` | `both` | `both`, `ui`, or `api` |
+| `-style` | empty | `css`, `scss`, or `sass`, with the same stem as the `.tsx` |
+| `-generate` | `true` | writes client, registers, and tree |
+| `-import_path` | `github.com/yurimoinhos/go-n-act` | Go import of this module |
+| `-ts_import` | `@aggitech/route` | TypeScript module |
 
-`-style` com `-only api` é erro. A rota `route` na raiz e a rota `__root` são erro: o layout raiz é `__root.tsx`. Arquivo que já existe não é sobrescrito. O `.tsx` chama `createFileRoute` com o caminho completo. O `.go` exporta um handler com o nome do último segmento e um comentário que o gerador copia. Parâmetro vira campo `route:"required"`. Splat vira `Rest` com `json:"rest,omitempty"`.
+`-style` with `-only api` is an error. The `route` route at the root and the `__root` route are errors: the root layout is `__root.tsx`. An existing file is not overwritten. The `.tsx` calls `createFileRoute` with the full path. The `.go` exports a handler named after the last segment and a comment that the generator copies. A parameter becomes a `route:"required"` field. A splat becomes `Rest` with `json:"rest,omitempty"`.
 
 ### test
 
-`gnact test` compara os arquivos gerados com o disco e, se estiverem iguais, roda `go test ./...` no módulo que contém a pasta de rotas. Não escreve geração. A saída do `go test` vai para stdout e stderr.
+`gnact test` compares the generated files with the disk and, if they match, runs `go test ./...` in the module that contains the routes folder. It does not write generation. `go test` output goes to stdout and stderr.
 
-| Flag | Padrão | Uso |
+| Flag | Default | Use |
 | --- | --- | --- |
-| `-dir` | `routes` | diretório das rotas |
-| `-import_path` | `github.com/yurimoinhos/go-n-act` | import Go usado na comparação |
-| `-ts_import` | `@aggitech/route` | módulo TypeScript usado na comparação |
+| `-dir` | `routes` | routes directory |
+| `-import_path` | `github.com/yurimoinhos/go-n-act` | Go import used for comparison |
+| `-ts_import` | `@aggitech/route` | TypeScript module used for comparison |
 
-Cada package Go ganha `Register`. A raiz ganha `RegisterAll`, que chama os filhos e o `Register` local quando a raiz tem endpoint.
+Each Go package gets `Register`. The root gets `RegisterAll`, which calls the children and the local `Register` when the root has an endpoint.
 
-O `.tsx` precisa exportar `Route` e chamar `createFileRoute` com o caminho exato daquela rota. O primeiro call do arquivo vale. Template string com `${}` é erro. `__root.tsx` chama `createRootRoute`.
+The `.tsx` must export `Route` and call `createFileRoute` with the exact path for that route. The first call in the file counts. A template string with `${}` is an error. `__root.tsx` calls `createRootRoute`.
 
 ## Router
 
-`createFileRoute("/clients/$id")` devolve a rota. `addChildren` liga o pai. `createRootRoute` é a raiz `__root`.
+`createFileRoute("/clients/$id")` returns the route. `addChildren` links the parent. `createRootRoute` is the `__root` root.
 
-A escolha da folha olha a árvore inteira. Segmento estático vale 10, parâmetro vale 3, splat vale 1, index soma mais 1. Empate fica com o id menor. A URL perde a barra final antes de comparar, então `/clients` escolhe o index `/clients/` e o layout `/clients` continua na cadeia de pais. Segmento pathless nunca é folha.
+Leaf selection looks at the whole tree. A static segment scores 10, a parameter scores 3, a splat scores 1, and index adds 1 more. A tie goes to the smaller id. The URL loses its trailing slash before comparison, so `/clients` picks the index `/clients/` and the layout `/clients` stays in the parent chain. A pathless segment is never a leaf.
 
-`beforeLoad` e loaders correm do pai para o filho. `validateSearch` corre antes do `beforeLoad` daquela rota. `redirect()` interrompe a carga. `replace` vale true por padrão. O nono redirect falha com `too many redirects`. `notFound()` e URL sem rota terminam com status `notFound`.
+`beforeLoad` and loaders run from parent to child. `validateSearch` runs before that route's `beforeLoad`. `redirect()` aborts the load. `replace` defaults to true. The ninth redirect fails with `too many redirects`. `notFound()` and a URL with no route end with status `notFound`.
 
-Enquanto a carga nova está pendente, os matches anteriores ficam. Carga substituída não grava o resultado e não aplica o redirect dela. Duas navegações ao mesmo href em voo compartilham uma carga. O cache guarda só loader que terminou bem. A chave é o id da rota mais o href. `staleTime` 0 busca de novo.
+While the new load is pending, previous matches stay. A superseded load does not write its result and does not apply its redirect. Two in-flight navigations to the same href share one load. The cache stores only loaders that finished successfully. The key is the route id plus the href. `staleTime` 0 fetches again.
 
-`MemoryHistory` não avisa os listeners em `push` e `replace`. `back` e `forward` avisam.
+`MemoryHistory` does not notify listeners on `push` and `replace`. `back` and `forward` do.
 
-`RouterProvider` desenha o componente da raiz, ou `Outlet`. `Outlet` desce um nível. `Link` chama `preventDefault` no clique esquerdo sem modificador.
+`RouterProvider` renders the root component, or `Outlet`. `Outlet` goes one level down. `Link` calls `preventDefault` on an unmodified left click.
 
-Os hooks `useLoaderData`, `useParams` e `useSearch` existem no objeto da rota depois que o entry `@aggitech/route` é importado.
+The hooks `useLoaderData`, `useParams`, and `useSearch` exist on the route object after the `@aggitech/route` entry is imported.
 
-## Limites
+## Limits
 
-- `int64` vira `number`. Acima de `2^53` o valor não é exato.
-- `[]byte` e `time.Time` viram `string`.
-- `interface`, `any`, canal e função não geram tipo.
-- Nil dentro de um map não é normalizado.
-- Handlers exportados no mesmo diretório precisam de nomes únicos.
-- Arquivo e diretório Go não podem conter `$`. Use `param_<nome>.go` e `splat.go`.
-- Arquivo Go não pode começar com `_`. Use `pathless_<nome>.go` ao lado de `_<nome>.tsx`. Diretório `_auth` pode conter `.go`.
-- Uma função exportada com a assinatura de handler é um endpoint.
-- Enum precisa ser constante exportada de um tipo nomeado.
-- O layout raiz é `__root.tsx`, não `route.tsx`.
-- O cliente gerado importa `@aggitech/route/client`.
+- `int64` becomes `number`. Above `2^53` the value is not exact.
+- `[]byte` and `time.Time` become `string`.
+- `interface`, `any`, channel, and function do not generate a type.
+- Nil inside a map is not normalized.
+- Exported handlers in the same directory need unique names.
+- A Go file and directory cannot contain `$`. Use `param_<name>.go` and `splat.go`.
+- A Go file cannot start with `_`. Use `pathless_<name>.go` next to `_<name>.tsx`. An `_auth` directory may contain `.go`.
+- An exported function with a handler signature is an endpoint.
+- An enum must be an exported constant of a named type.
+- The root layout is `__root.tsx`, not `route.tsx`.
+- The generated client imports `@aggitech/route/client`.
