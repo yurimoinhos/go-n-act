@@ -1,0 +1,8 @@
+module {{.Module}}
+
+go 1.23.0
+
+require {{.Lib}} v0.0.0
+{{if .Replace}}
+replace {{.Lib}} => {{.Replace}}
+{{end}}

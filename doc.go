@@ -1,8 +1,13 @@
-// Package route serves colocated UI routes over HTTP/1.1.
+// Package route serves colocated UI routes and REST actions over HTTP/1.1.
 //
-// Each route is a file stem. The .go file is the only server endpoint for that
-// stem, and the generated client is the only way the UI calls it. Handlers are
-// registered explicitly; a request cannot reach a function that was not registered.
+// Handlers are registered on a [Router] with an HTTP method and path:
+//
+//	r := route.NewRouter()
+//	_ = route.POST(r, "/clients", Create)
+//	_ = route.GET(r, "/clients/{id}", Get)
+//
+// File-based registration uses a //gnact:METHOD /path directive above an
+// exported handler; routegen emits the matching route.POST/GET/... calls.
 //
 // A handler is an exported function with one of these signatures:
 //
@@ -11,12 +16,14 @@
 //	func(ctx context.Context) (R, error)
 //	func(ctx context.Context) error
 //
-// T and R are structs. The principal comes from [Server.Authenticate], never
-// from the JSON body. Fields tagged route:"server" are rejected when the
-// client sends them. Fields tagged route:"required" must be present.
-// Unknown JSON fields are rejected.
+// T and R are structs. Path and query fields use path:"name" and
+// query:"name" tags. JSON body fields use json tags. The principal comes
+// from [Server.Authenticate], never from the request body. Fields tagged
+// route:"server" are rejected when the client sends them. Fields tagged
+// route:"required" must be present. Unknown JSON fields are rejected.
 //
-// Errors returned as [Error] keep their code and message. Any other error is
-// logged through [Server.OnError] and answered as an internal error, without
-// the underlying text.
+// Errors returned as [Error] are written as RFC 7807 problem details
+// (application/problem+json). Any other error is logged through
+// [Server.OnError] and answered as an internal problem, without the
+// underlying text.
 package route

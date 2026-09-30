@@ -1,4 +1,4 @@
-# route
+# route / gnact
 
 Library for colocated routes. Each route is a `.tsx` file and, when the route has a server, a `.go` file in the same directory. The `.go` file is the only endpoint for that route. The UI calls that endpoint through the generated client, over HTTP/1.1 with JSON.
 
@@ -22,14 +22,16 @@ gnact routegen -dir routes
 In the server `main`:
 
 ```go
-mux := route.NewMux()
-if err := routes.RegisterAll(mux); err != nil {
+import gnact "github.com/yurimoinhos/go-n-act"
+
+r := gnact.NewRouter()
+if err := routes.RegisterAll(r); err != nil {
     log.Fatal(err)
 }
-log.Fatal(http.ListenAndServe(":8080", &route.Server{
-    Mux: mux,
-    Authenticate: func(r *http.Request) (route.Principal, error) {
-        return route.Principal{Subject: "ada"}, nil
+log.Fatal(http.ListenAndServe(":8080", &gnact.Server{
+    Router: r,
+    Authenticate: func(req *http.Request) (gnact.Principal, error) {
+        return gnact.Principal{Subject: "ada"}, nil
     },
 }))
 ```
@@ -81,10 +83,9 @@ A static segment with the literal name `param_<name>`, `splat`, or `pathless_<na
 A handler is an exported function, with no receiver, in one of these forms:
 
 ```go
-func(ctx context.Context, in T) (R, error)
-func(ctx context.Context, in T) error
-func(ctx context.Context) (R, error)
-func(ctx context.Context) error
+r := gnact.NewRouter()
+_ = gnact.POST(r, "/clients", Create)
+_ = gnact.GET(r, "/clients/{id}", Get)
 ```
 
 `T` and `R` are structs, or pointers to structs. Functions that do not match this form are ignored. An exported function that matches this form is an endpoint, even if the file name looks like a helper.
@@ -106,24 +107,31 @@ Tags:
 A TypeScript enum is a set of exported constants of a named type:
 
 ```go
-type Role string
+//gnact:POST /clients
+func Create(ctx context.Context, in CreateIn) (Client, error)
 
-const (
-    RoleAdmin Role = "admin"
-    RoleUser  Role = "user"
-)
+//gnact:GET /clients/{id}
+func Get(ctx context.Context, in struct {
+    ID string `path:"id"`
+}) (Client, error)
 ```
 
 This generates `"admin" | "user"`.
 
-## HTTP
+Tags de input: `json` (body em POST/PUT/PATCH), `path:"nome"`, `query:"nome"`, `route:"required"|"server"|"-"`.
 
 `POST /rpc/{service}/{method}`. The body is the JSON object. An empty body becomes `{}`. A successful `200` returns the handler JSON, with no envelope. A handler with no output returns `{}`.
 
 Error:
 
 ```json
-{"code":"invalid_argument","message":"missing field id"}
+{
+  "type": "urn:gnact:error:invalid_argument",
+  "title": "Bad Request",
+  "status": 400,
+  "detail": "missing field id",
+  "code": "invalid_argument"
+}
 ```
 
 An unknown procedure responds `404` with `not found` and does not list methods. `GET` on a known procedure responds `405`.

@@ -9,18 +9,21 @@ import (
 	"go/types"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"golang.org/x/tools/go/packages"
 )
 
-// goHandler is one exported route function.
+// goHandler is one exported route function with a //gnact:METHOD path directive.
 type goHandler struct {
 	Name    string
 	Doc     string
 	In      types.Type
 	Out     types.Type
-	Service string
+	Method  string // GET, POST, PATCH, PUT, DELETE
+	Path    string // /clients/{id}
+	Service string // deprecated alias kept for transitional codegen
 	RouteID string
 	File    string
 }
@@ -118,6 +121,10 @@ func handlersInFile(pkg *packages.Package, file *ast.File, filename string) []go
 		if !ok || fd.Recv != nil || fd.Name == nil || !fd.Name.IsExported() {
 			continue
 		}
+		method, path, ok := gnactDirective(fd)
+		if !ok {
+			continue
+		}
 		obj := pkg.TypesInfo.Defs[fd.Name]
 		fn, ok := obj.(*types.Func)
 		if !ok || fn.Pkg() == nil {
@@ -136,14 +143,44 @@ func handlersInFile(pkg *packages.Package, file *ast.File, filename string) []go
 			doc = fd.Doc.Text()
 		}
 		found = append(found, goHandler{
-			Name: fn.Name(),
-			Doc:  doc,
-			In:   in,
-			Out:  out,
-			File: filename,
+			Name:   fn.Name(),
+			Doc:    doc,
+			In:     in,
+			Out:    out,
+			Method: method,
+			Path:   path,
+			File:   filename,
 		})
 	}
 	return found
+}
+
+var gnactDirectiveRE = regexp.MustCompile(`(?i)^gnact:(GET|POST|PATCH|PUT|DELETE)\s+(/\S*)\s*$`)
+
+func gnactDirective(fd *ast.FuncDecl) (method, path string, ok bool) {
+	if fd.Doc == nil {
+		return "", "", false
+	}
+	for _, c := range fd.Doc.List {
+		text := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(c.Text), "//"))
+		text = strings.TrimSpace(strings.TrimPrefix(text, "/*"))
+		text = strings.TrimSuffix(text, "*/")
+		text = strings.TrimSpace(text)
+		m := gnactDirectiveRE.FindStringSubmatch(text)
+		if m == nil {
+			continue
+		}
+		method = strings.ToUpper(m[1])
+		path = m[2]
+		if path != "/" {
+			path = strings.TrimSuffix(path, "/")
+		}
+		if path == "" || !strings.HasPrefix(path, "/") {
+			continue
+		}
+		return method, path, true
+	}
+	return "", "", false
 }
 
 func handlerSig(sig *types.Signature) (in, out types.Type, ok bool) {

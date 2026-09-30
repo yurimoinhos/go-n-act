@@ -1,0 +1,19 @@
+package {{.Package}}
+
+import "context"
+
+//gnact:{{.Method}} {{.Path}}
+// {{.Name}} handles this route.
+func {{.Name}}(_ context.Context, _ {{.Name}}In) ({{.Name}}Out, error) {
+	return {{.Name}}Out{OK: true}, nil
+}
+
+type {{.Name}}In struct {
+{{- range .Fields}}
+	{{.Name}} string {{.Tag}}
+{{- end}}
+}
+
+type {{.Name}}Out struct {
+	OK bool `json:"ok"`
+}
