@@ -258,3 +258,4 @@ The hooks `useLoaderData`, `useParams`, and `useSearch` exist on the route objec
 - An enum must be an exported constant of a named type.
 - The root layout is `__root.tsx`, not `route.tsx`.
 - The generated client imports `@aggitech/route/client`.
+- `gnact/` at the root of the routes directory is reserved for the embedded runtime. routegen skips it when scanning routes.
