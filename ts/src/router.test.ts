@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import {
+  BrowserHistory,
   MemoryHistory,
   createFileRoute,
   createRootRoute,
@@ -237,4 +238,132 @@ test("loader cache follows staleTime and in-flight calls share one load", async 
   await first;
   await second;
   expect(shared.state.matches.at(-1)?.loaderData).toBe("ok");
+});
+
+type FakeWindow = {
+  location: { pathname: string; search: string; hash: string };
+  history: {
+    pushState(data: unknown, unused: string, url: string): void;
+    replaceState(data: unknown, unused: string, url: string): void;
+    back(): void;
+    forward(): void;
+  };
+  addEventListener(type: "popstate", listener: () => void): void;
+  removeEventListener(type: "popstate", listener: () => void): void;
+  calls: string[];
+  entries: string[];
+};
+
+// fakeWindow is a minimal window.history: pushState/replaceState update the
+// location silently, back/forward move and fire popstate like a browser does.
+function fakeWindow(start: string): FakeWindow {
+  const entries = [start];
+  let cursor = 0;
+  const listeners = new Set<() => void>();
+  const location = { pathname: "", search: "", hash: "" };
+  const sync = () => {
+    const url = new URL(entries[cursor], "http://fake.test");
+    location.pathname = url.pathname;
+    location.search = url.search;
+    location.hash = url.hash;
+  };
+  const fire = () => {
+    sync();
+    for (const listener of listeners) listener();
+  };
+  sync();
+  const win: FakeWindow = {
+    location,
+    calls: [],
+    entries,
+    history: {
+      pushState(_data, _unused, url) {
+        win.calls.push("push " + url);
+        entries.splice(cursor + 1);
+        entries.push(url);
+        cursor++;
+        sync();
+      },
+      replaceState(_data, _unused, url) {
+        win.calls.push("replace " + url);
+        entries[cursor] = url;
+        sync();
+      },
+      back() {
+        if (cursor > 0) {
+          cursor--;
+          fire();
+        }
+      },
+      forward() {
+        if (cursor < entries.length - 1) {
+          cursor++;
+          fire();
+        }
+      },
+    },
+    addEventListener: (_type, listener) => listeners.add(listener),
+    removeEventListener: (_type, listener) => listeners.delete(listener),
+  };
+  return win;
+}
+
+test("BrowserHistory starts from the address bar and writes push, replace and redirects to it", async () => {
+  const root = createRootRoute({});
+  const home = createFileRoute("/")({});
+  const about = createFileRoute("/about")({});
+  const old = createFileRoute("/old")({
+    beforeLoad: () => {
+      throw redirect("/about");
+    },
+  });
+  root.addChildren([home, about, old]);
+  const win = fakeWindow("/about?tab=1#top");
+  const history = new BrowserHistory(win);
+  expect(history.href).toBe("/about?tab=1#top");
+
+  const router = createRouter({ routeTree: root, history });
+  await router.load();
+  expect(router.state.location.pathname).toBe("/about");
+  expect(win.calls).toEqual([]);
+
+  await router.navigate("/");
+  expect(win.calls).toEqual(["push /"]);
+  await router.navigate("/old");
+  expect(win.calls).toEqual(["push /", "push /old", "replace /about"]);
+  expect(history.href).toBe("/about");
+  expect(router.state.location.pathname).toBe("/about");
+});
+
+test("BrowserHistory follows the browser back and forward buttons", async () => {
+  const root = createRootRoute({});
+  const home = createFileRoute("/")({});
+  const about = createFileRoute("/about")({});
+  root.addChildren([home, about]);
+  const win = fakeWindow("/");
+  const router = createRouter({ routeTree: root, history: new BrowserHistory(win) });
+  await router.load();
+  await router.navigate("/about");
+
+  win.history.back();
+  await Promise.resolve();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(router.state.location.pathname).toBe("/");
+  expect(win.calls).toEqual(["push /about"]);
+});
+
+test("createRouter uses the browser history when a window exists", () => {
+  const root = createRootRoute({});
+  root.addChildren([createFileRoute("/users/")({})]);
+  const g = globalThis as { window?: unknown };
+  const previous = g.window;
+  g.window = fakeWindow("/users/");
+  try {
+    const router = createRouter({ routeTree: root });
+    expect(router.history).toBeInstanceOf(BrowserHistory);
+    expect(router.state.location.pathname).toBe("/users/");
+  } finally {
+    g.window = previous;
+  }
+  expect(createRouter({ routeTree: root }).history).toBeInstanceOf(MemoryHistory);
 });

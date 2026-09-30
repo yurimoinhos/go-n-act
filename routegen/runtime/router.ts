@@ -193,9 +193,19 @@ export type NavigateOptions = {
   history?: HistoryMode;
 };
 
-// MemoryHistory records navigation in memory.
+// RouterHistory is where the router reads and writes the current href.
 // push and replace do not notify subscribers. Back and forward do.
-export class MemoryHistory {
+export interface RouterHistory {
+  readonly href: string;
+  push(href: string): void;
+  replace(href: string): void;
+  back(): void;
+  forward(): void;
+  subscribe(listener: (href: string) => void): () => void;
+}
+
+// MemoryHistory records navigation in memory, for tests and non-browser hosts.
+export class MemoryHistory implements RouterHistory {
   private entries: string[];
   private cursor = 0;
   private listeners = new Set<(href: string) => void>();
@@ -242,11 +252,71 @@ export class MemoryHistory {
   }
 }
 
+// BrowserWindow is the part of window that BrowserHistory uses.
+export type BrowserWindow = {
+  location: { pathname: string; search: string; hash: string };
+  history: {
+    pushState(data: unknown, unused: string, url: string): void;
+    replaceState(data: unknown, unused: string, url: string): void;
+    back(): void;
+    forward(): void;
+  };
+  addEventListener(type: "popstate", listener: () => void): void;
+  removeEventListener(type: "popstate", listener: () => void): void;
+};
+
+// BrowserHistory keeps the router in step with the address bar.
+// push and replace write window.history. The browser back and forward
+// buttons reach subscribers through popstate.
+export class BrowserHistory implements RouterHistory {
+  private readonly win: BrowserWindow;
+
+  constructor(win: BrowserWindow = window as unknown as BrowserWindow) {
+    this.win = win;
+  }
+
+  get href(): string {
+    const { pathname, search, hash } = this.win.location;
+    return normalizeHref(pathname + search + hash);
+  }
+
+  push(href: string): void {
+    this.win.history.pushState(null, "", href);
+  }
+
+  replace(href: string): void {
+    this.win.history.replaceState(null, "", href);
+  }
+
+  back(): void {
+    this.win.history.back();
+  }
+
+  forward(): void {
+    this.win.history.forward();
+  }
+
+  subscribe(listener: (href: string) => void): () => void {
+    const onPop = () => listener(this.href);
+    this.win.addEventListener("popstate", onPop);
+    return () => this.win.removeEventListener("popstate", onPop);
+  }
+}
+
+// defaultHistory is the address bar in a browser and memory elsewhere.
+function defaultHistory(): RouterHistory {
+  const win = (globalThis as { window?: Partial<BrowserWindow> }).window;
+  if (win?.history && win.location && win.addEventListener) {
+    return new BrowserHistory(win as BrowserWindow);
+  }
+  return new MemoryHistory("/");
+}
+
 type CacheEntry = { data: unknown; at: number };
 
 export class Router {
   readonly routeTree: AnyRoute;
-  readonly history: MemoryHistory;
+  readonly history: RouterHistory;
   readonly staleTime: number;
   state: RouterState;
   private generation = 0;
@@ -264,9 +334,9 @@ export class Router {
   };
   getSnapshot = (): RouterState => this.state;
 
-  constructor(opts: { routeTree: AnyRoute; history?: MemoryHistory; staleTime?: number }) {
+  constructor(opts: { routeTree: AnyRoute; history?: RouterHistory; staleTime?: number }) {
     this.routeTree = opts.routeTree;
-    this.history = opts.history ?? new MemoryHistory("/");
+    this.history = opts.history ?? defaultHistory();
     this.staleTime = opts.staleTime ?? 0;
     this.state = {
       location: parseLocation(this.history.href),
@@ -433,9 +503,11 @@ export class Router {
   }
 }
 
+// createRouter builds a router. Without history it follows the address bar
+// in a browser and uses memory elsewhere.
 export function createRouter(opts: {
   routeTree: AnyRoute;
-  history?: MemoryHistory;
+  history?: RouterHistory;
   staleTime?: number;
 }): Router {
   return new Router(opts);

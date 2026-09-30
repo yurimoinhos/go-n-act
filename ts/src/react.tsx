@@ -1,4 +1,4 @@
-import { createContext, useContext, useSyncExternalStore, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useSyncExternalStore, type ReactNode } from "react";
 import { setRouteHooks, type AnyRoute, type Router } from "./router.ts";
 
 const RouterContext = createContext<Router | null>(null);
@@ -40,8 +40,17 @@ setRouteHooks({
 
 type Component = () => ReactNode;
 
+// RouterProvider renders the matched routes and loads the current location
+// on mount when nothing has loaded yet.
 export function RouterProvider({ router }: { router: Router }) {
   const state = useSyncExternalStore(router.subscribe, router.getSnapshot, router.getSnapshot);
+  useEffect(() => {
+    const current = router.getState();
+    if (current.status === "idle" && current.matches.length === 0 && current.error === undefined) {
+      // Failures land in router state (notFound / error); the promise has nothing left to report.
+      router.load().catch(() => {});
+    }
+  }, [router]);
   const root = state.matches[0];
   const Component = root?.route.options.component as Component | undefined;
   return (
